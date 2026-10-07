@@ -17,6 +17,16 @@ from radar.reports import stats_report
 from radar.rest import BlurRest
 
 CONSOLE_CHAT_ID = 0
+BOT_COMMANDS = [
+    ("feeds", "Choose alert feeds"),
+    ("whale", "Whale swap threshold, USD"),
+    ("watch", "Alert on every swap of a token"),
+    ("watchlist", "Your watched tokens"),
+    ("token", "Full report for a token mint"),
+    ("stats", "Last-hour activity and stream health"),
+    ("pause", "Pause alerts"),
+    ("resume", "Resume alerts"),
+]
 
 
 def plain(html_text: str) -> str:
@@ -49,6 +59,7 @@ async def run_console(api_key: str, feeds: set, whale_usd: float, watch: set, st
 async def run_telegram(api_key: str, token: str, db_path: str) -> None:
     from aiogram import Bot, Dispatcher
     from aiogram.client.default import DefaultBotProperties
+    from aiogram.types import BotCommand
 
     from radar.bot import build_router
     from radar.storage import SubscriptionStore
@@ -63,6 +74,8 @@ async def run_telegram(api_key: str, token: str, db_path: str) -> None:
     engine = RadarEngine(api_key, store.all, send, rest=rest)
     dp = Dispatcher()
     dp.include_router(build_router(store, engine))
+    await bot.set_my_commands([BotCommand(command=c, description=d) for c, d in BOT_COMMANDS])
+    await bot.set_my_short_description("Live Solana alerts: graduations, breakouts, whale swaps, watchlists. Powered by Solami Blur.")
     await engine.sync_streams()
     try:
         await dp.start_polling(bot)
