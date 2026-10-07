@@ -27,6 +27,14 @@ def test_metrics_window_counts_and_volumes():
     assert snap["top_surges"] == [{"mint": "M1", "multiple": 7.5}]
 
 
+def test_outlier_swaps_are_counted_but_not_added_to_volume():
+    m = Metrics(clock=Clock())
+    m.on_event("whales", {"type": "swap", "side": "sell", "volume_usd": "584806", "candle_ok": False})
+    m.on_event("whales", {"type": "swap", "side": "sell", "volume_usd": "9000", "candle_ok": True})
+    snap = m.snapshot()
+    assert snap["whale_sell_usd_1h"] == 9000 and snap["outliers_1h"] == 1 and snap["whale_swaps_1h"] == 1
+
+
 def test_metrics_drop_events_older_than_an_hour():
     clock = Clock()
     m = Metrics(clock=clock)

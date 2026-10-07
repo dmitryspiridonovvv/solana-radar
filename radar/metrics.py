@@ -28,10 +28,11 @@ class Metrics:
         self._swaps = deque()  # (ts, volume_usd, side, mint)
         self._lags = deque()  # (ts, seconds behind block time)
         self._surges = deque()  # (ts, mint, multiple)
+        self._outliers = deque()  # (ts,) swaps flagged candle_ok=false
 
     def _trim(self, now: float) -> None:
         cutoff = now - WINDOW_SECS
-        for q in (self._events, self._swaps, self._lags, self._surges):
+        for q in (self._events, self._swaps, self._lags, self._surges, self._outliers):
             while q and q[0][0] < cutoff:
                 q.popleft()
 
@@ -45,7 +46,10 @@ class Metrics:
         if isinstance(block_time, (int, float)) and block_time > 0:
             self._lags.append((now, max(0.0, now - block_time)))
         if kind == "swap":
-            self._swaps.append((now, num(event.get("volume_usd")), event.get("side"), event.get("mint")))
+            if event.get("candle_ok") is False:
+                self._outliers.append((now,))
+            else:
+                self._swaps.append((now, num(event.get("volume_usd")), event.get("side"), event.get("mint")))
         elif kind in ("surge", "radar"):
             self._surges.append((now, event.get("mint"), num(event.get("multiple"))))
         self._trim(now)
@@ -74,6 +78,7 @@ class Metrics:
             "whale_swaps_1h": len(self._swaps),
             "whale_buy_usd_1h": round(buy_usd, 2),
             "whale_sell_usd_1h": round(sell_usd, 2),
+            "outliers_1h": len(self._outliers),
             "lag_p50_secs": round(median(lags), 2) if lags else None,
             "lag_p95_secs": round(lags[int(0.95 * (len(lags) - 1))], 2) if lags else None,
             "reconnects": sum(self.reconnects.values()),

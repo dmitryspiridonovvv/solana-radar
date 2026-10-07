@@ -37,6 +37,8 @@ def short(address: str | None, size: int = 4) -> str:
 
 def usd(value) -> str:
     amount = num(value)
+    if amount >= 1_000_000_000:
+        return f"${amount / 1_000_000_000:.2f}B"
     if amount >= 1_000_000:
         return f"${amount / 1_000_000:.2f}M"
     if amount >= 1_000:
@@ -74,8 +76,9 @@ def format_event(event: dict, names: dict, reason: str) -> str:
         side = event.get("side", "?")
         icon = "🟢" if side == "buy" else "🔴"
         title = "Watched token" if reason == "watch" else "Whale swap"
+        outlier = "\n⚠️ Outlier print: USD value may be off" if event.get("candle_ok") is False else ""
         return (
-            f"{icon} <b>{title}</b>: {side.upper()} {usd(event.get('volume_usd'))} of {label}\n"
+            f"{icon} <b>{title}</b>: {side.upper()} {usd(event.get('volume_usd'))} of {label}{outlier}\n"
             f"Price {usd(event.get('price_usd'))} · {escape(event.get('dex', '?'))} · impact {num(event.get('price_impact_pct')):.2f}%\n"
             f"Trader <code>{short(event.get('trader'))}</code>\n{links(mint, event.get('signature'))}"
         )
@@ -157,7 +160,9 @@ class Router:
         if kind == "swap":
             if event.get("mint") in sub.watched:
                 return "watch"
-            if "whales" in sub.feeds and num(event.get("volume_usd")) >= sub.whale_usd:
+            # candle_ok=false marks a print Blur's price guard judged an outlier: real, but its USD
+            # value is unreliable, so it never counts as a whale.
+            if "whales" in sub.feeds and event.get("candle_ok") is not False and num(event.get("volume_usd")) >= sub.whale_usd:
                 return "whales"
             return None
         feed = {"graduation": "graduations", "meme": "near", "surge": "surges", "radar": "radar", "token_create": "launches"}.get(kind)

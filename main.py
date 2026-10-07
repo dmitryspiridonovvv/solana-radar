@@ -47,7 +47,7 @@ async def run_console(api_key: str, feeds: set, whale_usd: float, watch: set, st
         while True:
             await asyncio.sleep(stats_every)
             streams = {name: s.connected.is_set() for name, s in engine.streams.items()}
-            print(plain(stats_report(engine.metrics.snapshot(), streams, engine.fatal_errors())), end="\n\n", flush=True)
+            print(plain(stats_report(engine.metrics.snapshot(), streams, engine.fatal_errors(), engine.router.names)), end="\n\n", flush=True)
             if engine.streams and len(engine.fatal_errors()) == len(engine.streams):
                 print("All streams stopped with fatal errors - check SOLAMI_API_KEY.")
                 return

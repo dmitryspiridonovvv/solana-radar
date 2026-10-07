@@ -25,6 +25,15 @@ def test_whale_threshold_is_per_chat():
     assert [chat for chat, _ in router.route(swap(150_000), [small, big])] == [1, 2]
 
 
+def test_outlier_prints_are_never_whales_but_still_reach_watchers():
+    router = Router()
+    whale_fan = Subscription(1, feeds={"whales"}, whale_usd=10_000)
+    watcher = Subscription(2, feeds=set(), watched={MINT})
+    outlier = {**swap(584_806), "candle_ok": False}
+    [(chat, text)] = router.route(outlier, [whale_fan, watcher])
+    assert chat == 2 and "Outlier print" in text
+
+
 def test_watched_token_gets_every_swap_even_without_whales_feed():
     router = Router()
     sub = Subscription(1, feeds=set(), watched={MINT})

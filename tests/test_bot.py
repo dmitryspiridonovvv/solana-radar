@@ -127,6 +127,15 @@ async def test_token_report(h):
     await h.send(f"/token {MINT}")
     text = h.last
     assert "$NEVER" in text and "Holders 310" in text and "bonding 29%" in text and "LP burned 100%" in text
+    assert "⚠️" not in text  # 25% top-10, organic 25, LP burned: nothing to flag
+
+
+def test_risk_flags_on_a_concentrated_token():
+    from radar.reports import risk_flags
+
+    data = {"top10_pct": "92.2", "screener": {"organic_score": "4", "dev_pct": "15"}, "dev": {"tokens_launched": 37}, "market_cap_usd": "426400", "liquidity_usd": "5000"}
+    flags = risk_flags(data, {"lp_burn_pct": "0"})
+    assert flags == ["top-10 holders own 92%", "low organic score (4)", "dev holds 15%", "dev launched 37 tokens", "only 0% LP burned", "thin liquidity for its market cap"]
 
 
 async def test_pause_resume(h):

@@ -12,7 +12,9 @@ from .metrics import Metrics
 
 log = logging.getLogger(__name__)
 
-MAX_ALERTS_PER_MINUTE = 20  # per chat; Telegram itself allows roughly one message per second
+# Per chat and minute; Telegram itself allows roughly one message per second per chat. Swaps get their
+# own budget so a busy whale feed can never crowd out rare signals like graduations.
+MAX_ALERTS_PER_MINUTE = {"swap": 15, "signal": 25}
 NAME_WAIT_SECS = 1.5  # metadata arrives out of band, usually right after the first event for a mint
 
 Sender = Callable[[int, str], Awaitable[None]]
@@ -72,8 +74,9 @@ class RadarEngine:
         await self._route(event)
 
     async def _route(self, event: dict) -> None:
+        bucket = "swap" if event.get("type") == "swap" else "signal"
         for chat_id, text in self.router.route(event, self.get_subscriptions()):
-            await self._deliver(chat_id, text)
+            await self._deliver(chat_id, text, bucket)
 
     async def _resolve_name(self, mint: str | None) -> None:
         if not mint or mint in self.router.names:
@@ -92,12 +95,12 @@ class RadarEngine:
             except Exception as exc:
                 log.debug("metadata lookup failed for %s: %s", mint, exc)
 
-    async def _deliver(self, chat_id: int, text: str) -> None:
+    async def _deliver(self, chat_id: int, text: str, bucket: str = "signal") -> None:
         now = self.clock()
-        sent = self._sent[chat_id]
+        sent = self._sent[(chat_id, bucket)]
         while sent and sent[0] < now - 60:
             sent.popleft()
-        if len(sent) >= MAX_ALERTS_PER_MINUTE:
+        if len(sent) >= MAX_ALERTS_PER_MINUTE[bucket]:
             self.metrics.alerts_dropped += 1
             return
         sent.append(now)

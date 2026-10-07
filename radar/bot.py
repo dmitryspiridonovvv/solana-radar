@@ -142,7 +142,7 @@ def build_router(store: SubscriptionStore, engine: RadarEngine) -> Router:
     @router.message(Command("stats"))
     async def stats(message: Message) -> None:
         streams = {name: s.connected.is_set() for name, s in engine.streams.items()}
-        await message.answer(stats_report(engine.metrics.snapshot(), streams, engine.fatal_errors()), disable_web_page_preview=True)
+        await message.answer(stats_report(engine.metrics.snapshot(), streams, engine.fatal_errors(), engine.router.names), disable_web_page_preview=True)
 
     @router.message(Command("pause"))
     async def pause(message: Message) -> None:

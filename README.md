@@ -23,12 +23,14 @@ Built for the Superteam Earn bounty *Build something live on Solana data*.
 
 `/token <mint>` answers from `GET /data/token/full`: price, market cap, ATH,
 liquidity, holders, top-10 share, 24h/1h activity, bonding progress, organic
-score, dev history and the main pool with LP burn.
+score, dev history and the main pool with LP burn, plus plain-language risk flags computed from
+the same response: top-10 concentration, low organic score, dev holdings, serial launchers, unburned LP
+and liquidity that is thin for the market cap.
 
 `/stats` answers what the chain did in the last hour and how healthy the feed is:
 
 - launches, graduations and breakouts in the last hour, top breakouts by multiple;
-- tracked swap volume split into buys and sells;
+- tracked swap volume split into buys and sells, with outlier prints excluded;
 - events per minute, megabytes received, **block-to-bot lag (p50 / p95)**;
 - reconnects, alerts sent and alerts rate-limited, per-stream status.
 
@@ -43,6 +45,11 @@ score, dev history and the main pool with LP burn.
 - **Out-of-band `metadata` events** name tokens in alerts; if a name hasn't arrived within 1.5 s, the bot
   falls back to `GET /data/token/metadata`, without blocking the stream.
 - **Blur REST** (`api.solami.dev`) powers `/token`.
+- Swaps that Blur's price guard marks `candle_ok: false` never count as whales and stay out of volume
+  stats (one $585K outlier with 98% price impact showed up within the first minute of live testing);
+  watchers still see them, flagged as outliers.
+- Alerts are rate-limited per chat with separate budgets for swaps and signals, so a busy whale feed can
+  never crowd out a graduation.
 - Decimal-string numbers are parsed safely (`null` for non-finite values is handled), close codes 4001/4002 and
   HTTP 401/403 stop the stream with a clear message instead of retrying forever; other drops reconnect with
   jittered exponential backoff.
@@ -103,7 +110,7 @@ Alerts and the `/stats` summary print to the terminal - handy for a quick check 
 pytest
 ```
 
-43 tests, no network or keys needed. The stream tests run against a local fake of the Blur WebSocket
+47 tests, no network or keys needed. The stream tests run against a local fake of the Blur WebSocket
 (`tests/fake_blur.py`) and cover reconnects, rejected keys, the 4002 out-of-bandwidth close, live filter
 frames, garbage frames and handler errors. Bot tests drive full Telegram updates through aiogram with a
 fake session.

@@ -67,10 +67,26 @@ async def test_per_chat_rate_limit_drops_floods():
     sub = Subscription(1, feeds={"graduations"})
     engine = RadarEngine("k", lambda: [sub], send)
     engine.router.names[MINT] = {"name": "N", "symbol": "S"}
-    for _ in range(MAX_ALERTS_PER_MINUTE + 5):
+    for _ in range(MAX_ALERTS_PER_MINUTE["signal"] + 5):
         await engine.handle_event("signals", {"type": "graduation", "mint": MINT})
-    assert len(sent) == MAX_ALERTS_PER_MINUTE
+    assert len(sent) == MAX_ALERTS_PER_MINUTE["signal"]
     assert engine.metrics.alerts_dropped == 5
+
+
+async def test_whale_flood_cannot_crowd_out_graduations():
+    sent = []
+
+    async def send(chat_id, text):
+        sent.append(text)
+
+    sub = Subscription(1, feeds={"graduations", "whales"}, whale_usd=5_000)
+    engine = RadarEngine("k", lambda: [sub], send)
+    engine.router.names[MINT] = {"name": "N", "symbol": "S"}
+    for _ in range(100):
+        await engine.handle_event("whales", {"type": "swap", "mint": MINT, "side": "sell", "volume_usd": "9000"})
+    await engine.handle_event("signals", {"type": "graduation", "mint": MINT})
+    assert any("Graduated" in t for t in sent)
+    assert sum("Whale swap" in t for t in sent) == MAX_ALERTS_PER_MINUTE["swap"]
 
 
 async def test_failed_delivery_is_logged_not_raised():
